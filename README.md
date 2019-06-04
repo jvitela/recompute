@@ -1,6 +1,6 @@
 # Recompute
 
-Simple “selector” library (for Redux and others) inspired by Reselect and Computed properties in MobX, Aurelia and Angular.
+Simple “selector” library (for Redux and others) inspired by Reselect and Computed properties from MobX, Aurelia and Angular.
 Recompute Selectors use a more natural syntaxis and can receive N number of arguments.
 
 * Selectors depend on observed state properties.
