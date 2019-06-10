@@ -10,18 +10,16 @@ const states = []
 for (let i = 0; i < numOfStates; i++) {
   states.push({ a: 1, b: 2 })
 }
-
-suite('selector', () => {
-/* */
-    test('observer function signature does NOT allow more than one argument', () => {
+suite('observer', () => { 
+    test('function signature does NOT allow more than two arguments', () => {
         const { createObserver } = createContext();
         assert.throw(
-            () => createObserver((_, param) => param + 1),
-            'Observer methods cannot receive more than one argument'
+            () => createObserver((_, param1, param2) => param1 + param2 + 1),
+            'Observer methods cannot receive more than two arguments'
         )
     })
 
-    test('observer does NOT allow being invoked with more than one argument', () => {
+    test('does NOT allow being invoked with more than one argument', () => {
         const { createObserver } = createContext();
         const sumAll = createObserver(function (_) {
             // arguments[0] is always the internal state
@@ -32,12 +30,34 @@ suite('selector', () => {
         });
         assert.equal(sumAll(), 0);
         assert.throw(
-            () => sumAll(1),
-            'Observer methods cannot be invoked with arguments'
+            () => sumAll(1, 2, 3),
+            'Observer methods cannot be invoked with more than one argument'
         );
     })
 
-    test('observer can be invoked directly', () => { 
+    test('can be called without parameters', () => { 
+        const { createObserver, setState } = createContext({ a: 2 });
+        const getA = createObserver(state => state.a);
+
+        assert.equal(getA(), 2);
+        setState({ a: 3 });
+        assert.equal(getA(), 3);
+    })
+
+    test('can be called with one parameter', () => { 
+        const { createObserver, setState } = createContext({ a: 1, b:2, c:3 });
+        const getProp = createObserver((state, prop) => state[prop]);
+
+        assert.equal(getProp('a'), 1);
+        assert.equal(getProp('b'), 2);
+        assert.equal(getProp('c'), 3);
+        setState({ a: 4, b: 5, c:6 });
+        assert.equal(getProp('a'), 4);
+        assert.equal(getProp('b'), 5);
+        assert.equal(getProp('c'), 6);
+    })
+
+    test('direct calls do not conflict with selectors', () => { 
         const { createObserver, createSelector, setState } = createContext({ a: 2 });
         const getA = createObserver(state => state.a);
         const getAA = createSelector(() => getA() * getA());
@@ -46,8 +66,11 @@ suite('selector', () => {
         setState({ a: 3 });         // change value
         assert.equal(getA(), 3);    // observer won't invalidate any cache
         assert.equal(getAA(), 9);   // cache invalidated when observer runs
-    });
+    })
+})
 
+suite('selector', () => {
+/* */
     test('basic dependencies discovery', () => { 
         let state = { a: 1, b: 2 };
         const { createObserver, createSelector } = createContext();
@@ -139,6 +162,26 @@ suite('selector', () => {
         assert.equal(selector(), 5)
         assert.equal(selector(), 5)
         assert.equal(selector.recomputations(), 2)
+    })
+
+    test('basic selector passing arguments down', () => {
+        const { createObserver, createSelector, setState } = createContext({
+            persons: {
+                '1': { age: 25, name: 'John' },
+                '2': { age: 23, name: 'Jane' }
+            }
+        });
+        const getAge = createObserver((state, id) => state.persons[id].age);
+        const getName = createObserver((state, id) => state.persons[id].name);
+        const getPerson = createSelector(id => 
+            `${getName(id)} is ${getAge(id)} years old`
+        );
+
+        assert.equal(getPerson('1'), 'John is 25 years old')
+        assert.equal(getPerson('2'), 'Jane is 23 years old')
+        assert.equal(getPerson('1'), 'John is 25 years old')
+        assert.equal(getPerson('2'), 'Jane is 23 years old')
+        assert.equal(getPerson.recomputations(), 2)
     })
 
     if (!process.env.COVERAGE) {

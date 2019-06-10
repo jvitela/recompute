@@ -55,76 +55,41 @@ export function createContext(initialState) {
     let numSelectors = 0;
     let state = initialState;
 
-    // const stackResultsCache = createDefaultCache();
-
     const setState = newState => state = newState;
 
     function createObserver(resultFunc, options = {}) {
-        if (resultFunc.length > 1) {
-            throw new Error('Observer methods cannot receive more than one arguments');
+        if (resultFunc.length > 2) {
+            throw new Error('Observer methods cannot receive more than two arguments');
         }
 
         const id = ++numObservers;
-        // let parentSelectors = [];
-        // let parentSelectorsById = {};
 
         // let result;
         const isEqual = options.isEqual
             ? options.isEqual
-            : defaultEquals
-
-        // const getResult = () => resultFunc(state)
-            // stackResultsCache.has(id) ? stackResultsCache.get(id) : resultFunc(state)
-        
-        // const invalidateCaches = () => {
-        //     const value = resultFunc(state);
-
-        //     // if (result === value) {
-        //     if (result === value || (isEqual && isEqual(result, value))) {
-        //         return false;
-        //     }
-
-        //     const l = parentSelectors.length;
-        //     for (let i = 0; i < l; ++i) {
-        //         parentSelectors[i].invalidateCache();
-        //     }
-
-        //     result = value;
-        //     return true;
-        // };
-
-        // const addSelector = selector => {
-        //     if (!!parentSelectorsById[selector.id]) {
-        //         return;
-        //     }
-        //     parentSelectors.push(selector);
-        //     parentSelectorsById[selector.id] = selector;
-        // };
+            : defaultEquals;
 
         const observerInterface = {
             id,
             isEqual,
             resultFunc
-            // invalidateCaches
         };
 
         function observer() {
-            if (arguments.length > 0) {
-                throw new Error('Observer methods cannot be invoked with arguments');
+            if (arguments.length > 1) {
+                throw new Error('Observer methods cannot be invoked with more than one argument');
             }
-
-            const value = resultFunc(state);
+            const arg = arguments.length ? arguments[0] : undefined;
+            const value = arg !== undefined
+                ? resultFunc(state, arg)
+                : resultFunc(state);
 
             // Create a double link between this observer and
             //  the selectors calling it.
             if (stackedSelectors.length) {
                 stackedSelectors.forEach(selector => {
-                    // addSelector(selector);
-                    selector.addObserver(observerInterface, value);
+                    selector.addObserver(observerInterface, value, arg);
                 });
-                // save result only when observer is called
-                //  inside a selector
-                // result = value;
             }
 
             return value;
@@ -142,10 +107,8 @@ export function createContext(initialState) {
         let observersById = {};
         let observerResultsCache = createDefaultCache();
 
-        // const invalidateCache = () => cache.clear();
-
-        const addObserver = (observer, result) => {
-            observerResultsCache.set(observer.id, result);
+        const addObserver = (observer, result, arg) => {
+            observerResultsCache.set(observer.id, { result, arg });
             if (observer.id in observersById) {
                 return;
             }
@@ -170,19 +133,15 @@ export function createContext(initialState) {
             for (let i = 0; i < l; ++i) {
                 const observer = observers[i];
                 // Check if the observer result changed and 
-                //  invalidate related caches
-                // if (observers[i].invalidateCaches()) {
+                const prev = prevResults.get(observer.id);
+                const newResult = prev.arg === undefined
+                    ? observer.resultFunc(state)
+                    : observer.resultFunc(state, prev.arg);
 
-                const prevResult = prevResults.get(observer.id);
-                const newResult = observer.resultFunc(state);
-                if (!observer.isEqual(newResult, prevResult)) {
+                if (!observer.isEqual(newResult, prev.result)) {
                     prevResults.set(observer.id, newResult);
                     changed = true;
                 }
-
-                // if (!stackResultsCache.has(observer.id)) {
-                //     stackResultsCache.set(observer.id, newResult);
-                // }
             }
 
             // Clear the selector's cache if dependencies changed
@@ -201,7 +160,6 @@ export function createContext(initialState) {
 
         const selectorInterface = {
             id,
-            // invalidateCache,
             addObserver,
             mergeObservers
         };
@@ -229,12 +187,6 @@ export function createContext(initialState) {
             for (i = 0; i < l; ++i) {
                 stackedSelectors[i].mergeObservers(observersById);
             }
-
-            // Clear the cache of observer results
-            //  if there are no more selectors in the call stack
-            // if (l === 0) {
-            //     stackResultsCache.clear();
-            // }
 
             return result;
         };
