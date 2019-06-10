@@ -19,8 +19,18 @@ const defaultSerialize = args => {
     if (args.length === 1 && isPrimitive(args[0])) {
         return `${args[0]}`;
     }
-    return JSON.stringify(args);        
+    return JSON.stringify(args);
 };
+
+const getObserverKey = (id, arg) => {
+    if (arg === undefined) {
+        return `${id}`;
+    }
+    if (isPrimitive(arg)) {
+        return `${id}:${arg}`;
+    }
+    return `${id}:${JSON.stringify(arg)}`;
+}
 
 // Also from fast-memoize
 class DefaultCache {
@@ -104,24 +114,26 @@ export function createContext(initialState) {
         const serialize = options.serialize || defaultSerialize;
         let recomputations = 0;
         let observers = [];
-        let observersById = {};
+        let observersByKey = {};
         let observerResultsCache = createDefaultCache();
 
         const addObserver = (observer, result, arg) => {
-            observerResultsCache.set(observer.id, { result, arg });
-            if (observer.id in observersById) {
+            const key = getObserverKey(observer.id, arg);
+            observerResultsCache.set(key, { result, arg });
+            if (key in observersByKey) {
                 return;
             }
-            observers.push(observer);
-            observersById[observer.id] = observer;
+            const observerRef = Object.assign({ key }, observer);
+            observers.push(observerRef);
+            observersByKey[key] = observerRef;
         };
 
-        const mergeObservers = newObserversById => {
+        const mergeObservers = newObserversByKey => {
             Object.assign(
-                observersById,
-                newObserversById
+                observersByKey,
+                newObserversByKey
             );
-            observers = Object.values(observersById);
+            observers = Object.values(observersByKey);
         }
   
         const dependenciesChanged = () => {
@@ -133,14 +145,15 @@ export function createContext(initialState) {
             for (let i = 0; i < l; ++i) {
                 const observer = observers[i];
                 // Check if the observer result changed and 
-                const prev = prevResults.get(observer.id);
+                const prev = prevResults.get(observer.key);
                 const newResult = prev.arg === undefined
                     ? observer.resultFunc(state)
                     : observer.resultFunc(state, prev.arg);
 
                 if (!observer.isEqual(newResult, prev.result)) {
-                    prevResults.set(observer.id, newResult);
+                    prevResults.set(observer.key, newResult);
                     changed = true;
+                    break;
                 }
             }
 
@@ -185,14 +198,14 @@ export function createContext(initialState) {
             // Share observer dependencies with the parent selectors.
             l = stackedSelectors.length;
             for (i = 0; i < l; ++i) {
-                stackedSelectors[i].mergeObservers(observersById);
+                stackedSelectors[i].mergeObservers(observersByKey);
             }
 
             return result;
         };
 
         selector.recomputations = () => recomputations;
-        selector.dependencies = () => Object.keys(observersById);
+        selector.dependencies = () => Object.keys(observersByKey);
         return selector;
     }
 

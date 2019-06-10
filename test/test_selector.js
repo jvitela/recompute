@@ -688,5 +688,27 @@ suite('selector', () => {
         assert.equal(getAC(), 10);
         assert.equal(getAC.dependencies().join(','), '1,3');
     });
+
+    test('multiple dependencies to same observer', () => { 
+        const state = {
+            persons: {
+                '1': { age: 25 },
+                '2': { age: 22 },
+                '3': { age: 30 }
+            }
+        };
+        const { createObserver, createSelector } = createContext(state);
+        const getAge = createObserver((state, id) => state.persons[id].age);
+        const getYoungest = createSelector(ids => 
+            ids.reduce((acc, id) => {
+                const val = getAge(id);
+                return acc < val ? acc : val;
+            }, Infinity)
+        );
+        assert.equal(getYoungest(['1', '2', '3']), 22)
+        state.persons['1'].age = 19;
+        assert.equal(getYoungest(['1', '2', '3']), 19)
+        assert.equal(getYoungest.recomputations(), 2)        
+    })
 /* */
 });
