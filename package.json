@@ -77,5 +77,11 @@
         "NODE_ENV": "umd"
       }
     }
-  }
+  },
+  "homepage": "https://github.com/jvitela/recompute#readme",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "dependencies": {}
 }
