@@ -6,7 +6,11 @@
   "scripts": {
     "test": "better-npm-run test",
     "test:debug": "better-npm-run test:debug",
-    "test:cov": "better-npm-run test:cov"
+    "test:cov": "better-npm-run test:cov",
+    "compile:commonjs": "better-npm-run compile:commonjs",
+    "compile:umd": "better-npm-run compile:umd",
+    "compile:es": "babel -d es/ src/",
+    "compile": "npm run compile:commonjs && npm run compile:umd && npm run compile:es"
   },
   "keywords": [
     "selector",
@@ -14,10 +18,13 @@
     "memoized",
     "redux"
   ],
+  "bugs": {
+    "url": "https://github.com/jvitela/recompute/issues"
+  },
   "author": "jvitela",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jvitela/recompute.git"
+    "url": "git+https://github.com/jvitela/recompute.git"
   },
   "license": "MIT",
   "devDependencies": {
@@ -57,7 +64,18 @@
         "NODE_ENV": "test",
         "COVERAGE": "true"
       }
+    },
+    "compile:commonjs": {
+      "command": "babel -d lib/ src/",
+      "env": {
+        "NODE_ENV": "commonjs"
+      }
+    },
+    "compile:umd": {
+      "command": "mkdirp dist/ && babel -o dist/recompute.js src/",
+      "env": {
+        "NODE_ENV": "umd"
+      }
     }
-  },
-  "dependencies": {}
+  }
 }
