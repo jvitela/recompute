@@ -10,7 +10,8 @@
     "compile:commonjs": "better-npm-run compile:commonjs",
     "compile:umd": "better-npm-run compile:umd",
     "compile:es": "babel -d es/ src/",
-    "compile": "npm run compile:commonjs && npm run compile:umd && npm run compile:es"
+    "compile": "npm run compile:commonjs && npm run compile:umd && npm run compile:es",
+    "publish": "npm publish --access public"
   },
   "keywords": [
     "selector",
