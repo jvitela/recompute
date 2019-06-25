@@ -215,3 +215,8 @@ export function createContext(initialState) {
       setState
     };
 }
+
+const context = createContext();
+export const createObserver = context.createObserver;
+export const createSelector = context.createSelector;
+export const setState = context.setState;
