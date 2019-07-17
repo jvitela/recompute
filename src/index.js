@@ -94,7 +94,7 @@ export function createContext(initialState) {
                 ? resultFunc(state, arg)
                 : resultFunc(state);
 
-            // Create a double link between this observer and
+            // Create a link between this observer and
             //  the selectors calling it.
             if (stackedSelectors.length) {
                 stackedSelectors.forEach(selector => {
@@ -115,7 +115,7 @@ export function createContext(initialState) {
         let recomputations = 0;
         let observers = [];
         let observersByKey = {};
-        let observerResultsCache = createDefaultCache();
+        let observerResultsCache = new DefaultCache();
 
         const addObserver = (observer, result, arg) => {
             const key = getObserverKey(observer.id, arg);
@@ -128,10 +128,16 @@ export function createContext(initialState) {
             observersByKey[key] = observerRef;
         };
 
-        const mergeObservers = newObserversByKey => {
+        const mergeObservers = (newObserversByKey, newObserverResultsCache) => {
             Object.assign(
                 observersByKey,
                 newObserversByKey
+            );
+            // Observer results cache is always of type DefaultCache and has keys created with getObserverKey, 
+            //  therefore we can merge its internal cache property
+            Object.assign(
+                observerResultsCache.cache, 
+                newObserverResultsCache.cache
             );
             observers = Object.values(observersByKey);
         }
@@ -198,7 +204,7 @@ export function createContext(initialState) {
             // Share observer dependencies with the parent selectors.
             l = stackedSelectors.length;
             for (i = 0; i < l; ++i) {
-                stackedSelectors[i].mergeObservers(observersByKey);
+                stackedSelectors[i].mergeObservers(observersByKey, observerResultsCache);
             }
 
             return result;

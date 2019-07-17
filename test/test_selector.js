@@ -70,12 +70,10 @@ suite('observer', () => {
 })
 
 suite('selector', () => {
-/* */
     test('basic dependencies discovery', () => { 
-        let state = { a: 1, b: 2 };
         const { createObserver, createSelector } = createContext();
-        const getA = createObserver(() => state.a);
-        const getB = createObserver(() => state.b);
+        const getA = createObserver(() => 1);
+        const getB = createObserver(() => 2);
         const getAB = createSelector(() => getA() + getB());
         assert.equal(getAB(), 3);
         assert.equal(getAB.dependencies().join(','), '1,2');
@@ -182,6 +180,20 @@ suite('selector', () => {
         assert.equal(getPerson('1'), 'John is 25 years old')
         assert.equal(getPerson('2'), 'Jane is 23 years old')
         assert.equal(getPerson.recomputations(), 2)
+    })
+
+    test('Passing down different argument types', () => { 
+        const { createObserver, createSelector } = createContext();
+        const getProp = createObserver((_, prop) => prop);
+        const selProp = createSelector(prop => getProp(prop));
+
+        const objRef = {};
+        assert.strictEqual(selProp(objRef), objRef);
+        assert.strictEqual(selProp(true), true);
+        assert.strictEqual(selProp(2), 2);
+        assert.strictEqual(selProp(null), null);
+        assert.strictEqual(selProp(), undefined);
+        assert.strictEqual(selProp('123'), '123');
     })
 
     if (!process.env.COVERAGE) {
@@ -705,10 +717,23 @@ suite('selector', () => {
                 return acc < val ? acc : val;
             }, Infinity)
         );
-        assert.equal(getYoungest(['1', '2', '3']), 22)
+        assert.equal(getYoungest(['1', '2', '3']), 22);
         state.persons['1'].age = 19;
-        assert.equal(getYoungest(['1', '2', '3']), 19)
-        assert.equal(getYoungest.recomputations(), 2)        
+        assert.equal(getYoungest(['1', '2', '3']), 19);
+        assert.equal(getYoungest.recomputations(), 2);
     })
-/* */
+
+    test('discover dependency from used selector', () => { 
+        const { createObserver, createSelector } = createContext();
+
+        const getC = createObserver(() => 1);
+        const getB = createSelector(() => getC());
+        const getA = createSelector(() => getB());
+
+        assert.equal(getB(), 1); // register getC as dependency
+        assert.equal(getA(), 1); // inherits getC as dependency from getB
+        assert.equal(getA(), 1); // uses cache
+        assert.equal(getB.recomputations(), 1);
+        assert.equal(getA.recomputations(), 1);
+    })
 });
