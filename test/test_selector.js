@@ -70,6 +70,7 @@ suite('observer', () => {
 })
 
 suite('selector', () => {
+
     test('basic dependencies discovery', () => { 
         const { createObserver, createSelector } = createContext();
         const getA = createObserver(() => 1);
@@ -735,5 +736,20 @@ suite('selector', () => {
         assert.equal(getA(), 1); // uses cache
         assert.equal(getB.recomputations(), 1);
         assert.equal(getA.recomputations(), 1);
+    })
+
+    test('Updates cache when a dependency changes', () => {
+        const { createObserver, createSelector } = createContext();
+        let value  = 1;
+        const getter = createObserver(() => value);
+        const selector = createSelector(() => getter());
+
+        assert.equal(selector(), 1);
+
+        value = undefined;
+        assert.equal(selector(), undefined);
+
+        value = 3;
+        assert.equal(selector(), 3);
     })
 });

@@ -119,7 +119,9 @@ export function createContext(initialState) {
 
         const addObserver = (observer, result, arg) => {
             const key = getObserverKey(observer.id, arg);
-            observerResultsCache.set(key, { result, arg });
+            if (!observerResultsCache.has(key)) {
+                observerResultsCache.set(key, { result, arg });
+            }
             if (key in observersByKey) {
                 return;
             }
@@ -151,13 +153,13 @@ export function createContext(initialState) {
             for (let i = 0; i < l; ++i) {
                 const observer = observers[i];
                 // Check if the observer result changed and 
-                const prev = prevResults.get(observer.key);
-                const newResult = prev.arg === undefined
+                const { arg, result } = prevResults.get(observer.key);
+                const newResult = arg === undefined
                     ? observer.resultFunc(state)
-                    : observer.resultFunc(state, prev.arg);
+                    : observer.resultFunc(state, arg);
 
-                if (!observer.isEqual(newResult, prev.result)) {
-                    prevResults.set(observer.key, newResult);
+                if (!observer.isEqual(newResult, result)) {
+                    prevResults.set(observer.key, { arg, result: newResult });
                     changed = true;
                     break;
                 }
