@@ -1,6 +1,6 @@
 {
   "name": "@jvitela/recompute",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Selector functions based on Observable and Computed values.",
   "main": "lib/index.js",
   "scripts": {
