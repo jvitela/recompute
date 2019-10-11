@@ -1,4 +1,6 @@
 # Recompute
+[![Travis][build-badge]][build]
+[![npm package][npm-badge]][npm]
 
 Simple “selector” library (for Redux and others) inspired by Reselect and Computed properties from MobX, Aurelia and Angular.
 
@@ -65,7 +67,7 @@ console.log(total('EUR'))    // { total: 2.322, currency: 'EUR' }
   - [`createSelector`](#createselector-resultfunc-options)
 
 ## Installation
-In development...
+npm i @jvitela/recompute
 
 ### Motivation for Memoized Selectors
 
