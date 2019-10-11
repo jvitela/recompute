@@ -1,4 +1,5 @@
 # Recompute
+
 [![Travis][build-badge]][build]
 [![npm package][npm-badge]][npm]
 
@@ -294,3 +295,9 @@ Take into account that observers are **not memoized** and using expensive equali
 Selectors created with `createSelector` have an unlimited cache. This means they always store the last result matching its set of arguments.
 A selector recomputes when invoked with a different set of arguments. 
 Its cache will be cleared when at least one of the observers it depends on returns a different value.
+
+[build-badge]: https://travis-ci.org/jvitela/recompute.svg?branch=master
+[build]: https://travis-ci.org/jvitela/recompute
+
+[npm-badge]: https://img.shields.io/npm/v/@jvitela/recompute.svg?style=flat-square
+[npm]: https://www.npmjs.com/package/@jvitela/recompute
