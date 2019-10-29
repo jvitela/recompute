@@ -38,9 +38,9 @@ class DefaultCache {
         this.cache = Object.create(null);
     }
 
-    has(key) {
-        return (key in this.cache);
-    }
+    // has(key) {
+    //     return (key in this.cache);
+    // }
 
     get(key) {
         return this.cache[key];
@@ -50,9 +50,9 @@ class DefaultCache {
         this.cache[key] = value;
     }
 
-    clear() {
-        this.cache = Object.create(null);
-    }
+    // clear() {
+    //     this.cache = Object.create(null);
+    // }
 }
 
 function Computation() {
