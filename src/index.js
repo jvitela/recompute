@@ -55,31 +55,31 @@ class DefaultCache {
     // }
 }
 
-function Computation() {
-    let observers = {
-        list: [], // list of observers, used for fast iteration
-        idx: {}   // index by key, used to merge with other computation objects
-    };
+class Computation {
+    constructor() {
+        this.observersList = []; // list of observers, used for fast iteration
+        this.observersIdx = {};   // index by key, used to merge with other computation objects
+    } 
 
-    const addObserver = (observer) => {
+    addObserver(observer) {
         const key = getObserverKey(observer.id, observer.arg);
-        observers.idx[key] = observer;
-        observers.list = Object.values(observers.idx);
-    };
-
-    const mergeObservers = other => { 
-        // Fast merge using the indexes
-        Object.assign(
-            observers.idx,
-            other.observers.idx
-        );
-        // Regenerate the iteration list
-        observers.list = Object.values(observers.idx);
+        this.observersIdx[key] = observer;
+        this.observersList = Object.values(this.observersIdx);
     }
 
-    const dependenciesChanged = state => {
-        for (let i = 0, l = observers.list.length; i < l; ++i) {
-            const observer = observers.list[i];
+    mergeObservers(other) { 
+        // Fast merge using the indexes
+        Object.assign(
+            this.observersIdx,
+            other.observersIdx
+        );
+        // Regenerate the iteration list
+        this.observersList = Object.values(this.observersIdx);
+    }
+
+    dependenciesChanged(state) {
+        for (let i = 0, l = this.observersList.length; i < l; ++i) {
+            const observer = this.observersList[i];
             const newResult = observer.arg === undefined
                 ? observer.resultFunc(state)
                 : observer.resultFunc(state, observer.arg);
@@ -92,123 +92,164 @@ function Computation() {
         return false;
     }
 
-    return {
-        // For mergeObservers
-        observers,
-        // interface
-        addObserver,
-        mergeObservers,
-        dependenciesChanged,
-        // For testing
-        observersIds: () => Object.keys(observers.idx)
-    };
+    // For testing
+    observersIds() {
+        return Object.keys(this.observersIdx);
+    }
 }
 
 const createDefaultCache = () => new DefaultCache();
 
 const defaultEquals = (a, b) => a === b;
 
-export function createContext(initialState) {
-    const computationsStack  = [];
-    let numObservers = 0;
-    let state = initialState;
+class Observer {
+    constructor(id, resultFunc, isEqual, ctx) {
+        this.id = id;
+        this.resultFunc = resultFunc;
+        this.isEqual = isEqual;
+        this.ctx = ctx;
+    }
 
-    const setState = newState => state = newState;
+    invoke() {
+        if (arguments.length > 1) {
+            throw new Error('Observer methods cannot be invoked with more than one argument');
+        }
+        const arg = arguments.length ? arguments[0] : undefined;
+        const result = arg !== undefined
+            ? this.resultFunc(this.ctx.state, arg)
+            : this.resultFunc(this.ctx.state);
 
-    function createObserver(resultFunc, options = {}) {
+        // Create a link between this observer and
+        //  the selectors calling it.
+        if (this.ctx.computationsStack.length) {
+            this.ctx.computationsStack.forEach(computation => {
+                computation.addObserver({
+                    id: this.id,
+                    isEqual: this.isEqual,
+                    resultFunc: this.resultFunc,
+                    arg,
+                    result,
+                });
+            });
+        }
+
+        return result;
+    }
+
+    getProxy() {
+        return this.invoke.bind(this);
+    }
+}
+
+class Selector {
+    constructor(computeFunc, cache, serialize, ctx) {
+        this.recomputations = 0;
+        this.computeFunc = computeFunc;
+        this.cache = cache;
+        this.serialize = serialize;
+        this.ctx = ctx;
+    }
+
+    invoke() {
+        let i, l;
+        const cacheKey = this.serialize(arguments);
+        let computation = this.cache.get(cacheKey);
+
+        if (
+            !computation ||
+            computation.dependenciesChanged(this.ctx.state)  // dependencies didn't change
+        ) {
+            // invalidate the cache if dependencies changed??
+            // if (computation) {
+            //     this.cache.clear();
+            // }
+            if (!computation) {
+                computation = new Computation(cacheKey);
+            }
+
+            // Compute new result
+            this.ctx.computationsStack.push(computation);
+            computation.result = this.computeFunc.apply(null, arguments);
+            this.ctx.computationsStack.pop();
+
+            // Store new computation in the cache
+            this.cache.set(cacheKey, computation);
+            ++this.recomputations;
+        }
+
+        // Share observer dependencies with the parent selectors.
+        l = this.ctx.computationsStack.length;
+        for (i = 0; i < l; ++i) {
+            this.ctx.computationsStack[i].mergeObservers(computation);
+        }
+
+        return computation.result;
+    };
+    
+    dependencies() {
+        const cacheKey = this.serialize(arguments);
+        const computation = this.cache.get(cacheKey);
+        if (computation) {
+            return computation.observersIds();
+        }
+    }
+
+    getProxy() {
+        const proxy = this.invoke.bind(this);
+        proxy.dependencies = this.dependencies.bind(this);
+        proxy.recomputations = () => this.recomputations;
+        return proxy;
+    }
+}
+
+class Context {
+
+    constructor(initialState) {
+        this.computationsStack = [];
+        this.numObservers = 0;
+        this.state = initialState;
+    }
+
+    setState(newState) {
+        this.state = newState;
+    }
+
+    createObserver(resultFunc, options = {}) {
         if (resultFunc.length > 2) {
             throw new Error('Observer methods cannot receive more than two arguments');
         }
 
-        const id = ++numObservers;
+        const id = ++this.numObservers;
 
         // let result;
         const isEqual = options.isEqual
             ? options.isEqual
             : defaultEquals;
 
-        function observer() {
-            if (arguments.length > 1) {
-                throw new Error('Observer methods cannot be invoked with more than one argument');
-            }
-            const arg = arguments.length ? arguments[0] : undefined;
-            const result = arg !== undefined
-                ? resultFunc(state, arg)
-                : resultFunc(state);
-
-            // Create a link between this observer and
-            //  the selectors calling it.
-            if (computationsStack.length) {
-                computationsStack.forEach(computation => {
-                    computation.addObserver({ id, arg, result, isEqual, resultFunc });
-                });
-            }
-
-            return result;
-        }
-
-        return observer;
+        const observer = new Observer(id, resultFunc, isEqual, this);
+        return observer.getProxy();
     }
 
-    function createSelector(computeFunc, options = {}) {
-        // const id = ++numSelectors;
+    createSelector(computeFunc, options = {}) {
         const cache = options.cache || createDefaultCache();
         const serialize = options.serialize || defaultSerialize;
-        let recomputations = 0;
-
-        function selector() {
-            let i, l;
-            const cacheKey = serialize(arguments);
-            let computation = cache.get(cacheKey);
-
-            if (
-                !computation ||
-                computation.dependenciesChanged(state)  // dependencies didn't change
-            ) {
-                // invalidate the cache if dependencies changed??
-                // if (computation) {
-                //     cache.clear();
-                // }
-                if (!computation) {
-                    computation = Computation(cacheKey);
-                }
-
-                // Compute new result
-                computationsStack.push(computation);
-                computation.result = computeFunc.apply(null, arguments);
-                computationsStack.pop();
-
-                // Store new computation in the cache
-                cache.set(cacheKey, computation);
-                ++recomputations;
-            }
-
-            // Share observer dependencies with the parent selectors.
-            l = computationsStack.length;
-            for (i = 0; i < l; ++i) {
-                computationsStack[i].mergeObservers(computation);
-            }
-
-            return computation.result;
-        };
-
-        selector.recomputations = () => recomputations;
-        selector.dependencies = function() {
-            const cacheKey = serialize(arguments);
-            const computation = cache.get(cacheKey);
-            if (computation) {
-                return computation.observersIds();
-            }
-        };
-        return selector;
+        const selector = new Selector(computeFunc, cache, serialize, this);
+        return selector.getProxy();
     }
 
-    return {
-      createObserver,
-      createSelector,
-      setState
-    };
+    getProxy() {
+        return {
+            createObserver: this.createObserver.bind(this),
+            createSelector: this.createSelector.bind(this),
+            setState: this.setState.bind(this)
+        };
+    }
 }
+
+export const createContext = initialState => {
+    const context = new Context(initialState);
+    return context.getProxy();
+};
 
 const context = createContext();
 export const createObserver = context.createObserver;
