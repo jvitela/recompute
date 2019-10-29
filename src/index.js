@@ -55,14 +55,62 @@ class DefaultCache {
     }
 }
 
+function Computation() {
+    let observers = {
+        list: [], // list of observers, used for fast iteration
+        idx: {}   // index by key, used to merge with other computation objects
+    };
+
+    const addObserver = (observer) => {
+        const key = getObserverKey(observer.id, observer.arg);
+        observers.idx[key] = observer;
+        observers.list = Object.values(observers.idx);
+    };
+
+    const mergeObservers = other => { 
+        // Fast merge using the indexes
+        Object.assign(
+            observers.idx,
+            other.observers.idx
+        );
+        // Regenerate the iteration list
+        observers.list = Object.values(observers.idx);
+    }
+
+    const dependenciesChanged = state => {
+        for (let i = 0, l = observers.list.length; i < l; ++i) {
+            const observer = observers.list[i];
+            const newResult = observer.arg === undefined
+                ? observer.resultFunc(state)
+                : observer.resultFunc(state, observer.arg);
+
+            if (! observer.isEqual(newResult, observer.result)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    return {
+        // For mergeObservers
+        observers,
+        // interface
+        addObserver,
+        mergeObservers,
+        dependenciesChanged,
+        // For testing
+        observersIds: () => Object.keys(observers.idx)
+    };
+}
+
 const createDefaultCache = () => new DefaultCache();
 
 const defaultEquals = (a, b) => a === b;
 
 export function createContext(initialState) {
-    const stackedSelectors  = [];
+    const computationsStack  = [];
     let numObservers = 0;
-    let numSelectors = 0;
     let state = initialState;
 
     const setState = newState => state = newState;
@@ -79,141 +127,79 @@ export function createContext(initialState) {
             ? options.isEqual
             : defaultEquals;
 
-        const observerInterface = {
-            id,
-            isEqual,
-            resultFunc
-        };
-
         function observer() {
             if (arguments.length > 1) {
                 throw new Error('Observer methods cannot be invoked with more than one argument');
             }
             const arg = arguments.length ? arguments[0] : undefined;
-            const value = arg !== undefined
+            const result = arg !== undefined
                 ? resultFunc(state, arg)
                 : resultFunc(state);
 
             // Create a link between this observer and
             //  the selectors calling it.
-            if (stackedSelectors.length) {
-                stackedSelectors.forEach(selector => {
-                    selector.addObserver(observerInterface, value, arg);
+            if (computationsStack.length) {
+                computationsStack.forEach(computation => {
+                    computation.addObserver({ id, arg, result, isEqual, resultFunc });
                 });
             }
 
-            return value;
+            return result;
         }
 
         return observer;
     }
 
     function createSelector(computeFunc, options = {}) {
-        const id = ++numSelectors;
+        // const id = ++numSelectors;
         const cache = options.cache || createDefaultCache();
         const serialize = options.serialize || defaultSerialize;
         let recomputations = 0;
-        let observers = [];
-        let observersByKey = {};
-        let observerResultsCache = new DefaultCache();
-
-        const addObserver = (observer, result, arg) => {
-            const key = getObserverKey(observer.id, arg);
-            if (!observerResultsCache.has(key)) {
-                observerResultsCache.set(key, { result, arg });
-            }
-            if (key in observersByKey) {
-                return;
-            }
-            const observerRef = Object.assign({ key }, observer);
-            observers.push(observerRef);
-            observersByKey[key] = observerRef;
-        };
-
-        const mergeObservers = (newObserversByKey, newObserverResultsCache) => {
-            Object.assign(
-                observersByKey,
-                newObserversByKey
-            );
-            // Observer results cache is always of type DefaultCache and has keys created with getObserverKey, 
-            //  therefore we can merge its internal cache property
-            Object.assign(
-                observerResultsCache.cache, 
-                newObserverResultsCache.cache
-            );
-            observers = Object.values(observersByKey);
-        }
-  
-        const dependenciesChanged = () => {
-            // Optimized for performance
-            let changed = false;
-            const prevResults = observerResultsCache; // observer dependencies
-            const l = observers.length;
-
-            for (let i = 0; i < l; ++i) {
-                const observer = observers[i];
-                // Check if the observer result changed and 
-                const { arg, result } = prevResults.get(observer.key);
-                const newResult = arg === undefined
-                    ? observer.resultFunc(state)
-                    : observer.resultFunc(state, arg);
-
-                if (!observer.isEqual(newResult, result)) {
-                    prevResults.set(observer.key, { arg, result: newResult });
-                    changed = true;
-                    break;
-                }
-            }
-
-            // Clear the selector's cache if dependencies changed
-            if (changed) {
-                cache.clear();
-            }
-            return changed;
-        }
-
-        const computeResult = (cacheKey, args) => {
-            const result = computeFunc(...args);
-            cache.set(cacheKey, result);
-            ++recomputations;
-            return result;
-        };
-
-        const selectorInterface = {
-            id,
-            addObserver,
-            mergeObservers
-        };
 
         function selector() {
-            let i, l, result;
+            let i, l;
             const cacheKey = serialize(arguments);
+            let computation = cache.get(cacheKey);
 
             if (
-                cache.has(cacheKey) &&  // cache exists
-                !dependenciesChanged()  // dependencies didn't change
+                !computation ||
+                computation.dependenciesChanged(state)  // dependencies didn't change
             ) {
-                result = cache.get(cacheKey);
-                // console.log(`[CACHED] ${id}: ${JSON.stringify(result)}`);
+                // invalidate the cache if dependencies changed??
+                // if (computation) {
+                //     cache.clear();
+                // }
+                if (!computation) {
+                    computation = Computation(cacheKey);
+                }
 
-            } else {
-                stackedSelectors.push(selectorInterface);
-                result = computeResult(cacheKey, arguments);
-                stackedSelectors.pop();
-                // console.log(`[COMPUTED] ${id}: ${JSON.stringify(result)}`);
+                // Compute new result
+                computationsStack.push(computation);
+                computation.result = computeFunc.apply(null, arguments);
+                computationsStack.pop();
+
+                // Store new computation in the cache
+                cache.set(cacheKey, computation);
+                ++recomputations;
             }
 
             // Share observer dependencies with the parent selectors.
-            l = stackedSelectors.length;
+            l = computationsStack.length;
             for (i = 0; i < l; ++i) {
-                stackedSelectors[i].mergeObservers(observersByKey, observerResultsCache);
+                computationsStack[i].mergeObservers(computation);
             }
 
-            return result;
+            return computation.result;
         };
 
         selector.recomputations = () => recomputations;
-        selector.dependencies = () => Object.keys(observersByKey);
+        selector.dependencies = function() {
+            const cacheKey = serialize(arguments);
+            const computation = cache.get(cacheKey);
+            if (computation) {
+                return computation.observersIds();
+            }
+        };
         return selector;
     }
 
