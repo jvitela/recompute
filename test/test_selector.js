@@ -77,7 +77,7 @@ suite('selector', () => {
         const getB = createObserver(() => 2);
         const getAB = createSelector(() => getA() + getB());
         assert.equal(getAB(), 3);
-        assert.equal(getAB.dependencies().join(','), '1,2');
+        assert.sameMembers(getAB.dependencies(), [getA.id, getB.id]);
     });
 
     test('inherits dependencies from children selectors', () => {
@@ -93,11 +93,11 @@ suite('selector', () => {
         const getABC = createSelector(() => (getA2B() + getA2C()) / 2);
 
         assert.equal(getABC(), 6); // fill cache
-        assert.equal(get2B.dependencies().join(','), '2');
-        assert.equal(get2C.dependencies().join(','), '3');
-        assert.equal(getA2B.dependencies().join(','), '1,2');
-        assert.equal(getA2C.dependencies().join(','), '1,3');
-        assert.equal(getABC.dependencies().join(','), '1,2,3');
+        assert.sameMembers(get2B.dependencies(),  [getB.id]);
+        assert.sameMembers(get2C.dependencies(),  [getC.id]);
+        assert.sameMembers(getA2B.dependencies(), [getA.id, getB.id]);
+        assert.sameMembers(getA2C.dependencies(), [getA.id, getC.id]);
+        assert.sameMembers(getABC.dependencies(), [getA.id, getB.id, getC.id]);
     });
 
     test('basic selector', () => {
@@ -687,8 +687,8 @@ suite('selector', () => {
 
         assert.equal(getAB(), 10);
         assert.equal(getAC(), 5);
-        assert.equal(getAB.dependencies().join(','), '2');
-        assert.equal(getAC.dependencies().join(','), '1');
+        assert.sameMembers(getAB.dependencies(), [getB.id]);
+        assert.sameMembers(getAC.dependencies(), [getA.id]);
 
         setState({
             a: -5,
@@ -697,9 +697,9 @@ suite('selector', () => {
         });
 
         assert.equal(getAB(), 0);
-        assert.equal(getAB.dependencies().join(','), '1,2');
+        assert.sameMembers(getAB.dependencies(), [getA.id, getB.id]);
         assert.equal(getAC(), 10);
-        assert.equal(getAC.dependencies().join(','), '1,3');
+        assert.sameMembers(getAC.dependencies(), [getA.id, getC.id]);
     });
 
     test('multiple dependencies to same observer', () => { 
@@ -751,5 +751,84 @@ suite('selector', () => {
 
         value = 3;
         assert.equal(selector(), 3);
+    })
+});
+
+suite('test utils', () => {
+    test('Observer ids', () => { 
+        const { createObserver } = createContext();
+        const getA = createObserver(() => 1);
+        const getB = createObserver(() => 2);
+        assert.exists(getA.id);
+        assert.exists(getB.id);
+        assert.notEqual(getA.id, getB.id);
+    })
+
+    test('Clear cache', () => { 
+        const { createObserver, createSelector } = createContext();
+        const getA = createObserver(() => 2);
+        const getB = createObserver(() => 3);
+        const getAtimesB = createSelector(() => getA() * getB());
+        assert.isArray(getAtimesB.dependencies());
+        assert.isEmpty(getAtimesB.dependencies());
+        assert.equal(getAtimesB(), 6);
+        assert.includeOrderedMembers(getAtimesB.dependencies(), [
+            getA.id,
+            getB.id
+        ]);
+    })
+ 
+    test('Mock cached results', () => {
+        const { createObserver, createSelector } = createContext();
+        const getA = createObserver(() => 2);
+        const timesA = createSelector(times => getA() * times);
+
+        timesA.mock(5).result(10);
+        timesA.mock(10).result(20);
+        assert.equal(timesA(5),  10);
+        assert.equal(timesA(10), 20);
+        assert.equal(timesA.recomputations(), 0);
+    })
+
+    test('Mock nested selectors', () => {
+        const { createObserver, createSelector } = createContext();
+        const getA = createObserver(() => 2);
+        const getB = createObserver(() => 3);
+        const timesA = createSelector(() => getA() * 2);
+        const timesB = createSelector(() => getB() * 3);
+        const sumAB = createSelector(() => timesA() + timesB());
+
+        timesA.mock().result(5);
+        timesB.mock().result(6);
+        assert.equal(sumAB(), 11);
+        assert.equal(timesA.recomputations(), 0);
+        assert.equal(timesB.recomputations(), 0);
+        assert.equal(sumAB.recomputations(),  1);
+    })
+
+    test('Clear cache', () => { 
+        const { createObserver, createSelector } = createContext();
+        const getA = createObserver(() => 2);
+        const timesA = createSelector(times => getA() * times);
+
+        timesA.mock(2).result(4);
+        timesA.mock(3).result(6);
+        assert.equal(timesA(2), 4);
+        assert.equal(timesA(3), 6);
+        assert.equal(timesA.recomputations(), 0);
+
+        timesA.clearCache();
+        assert.equal(timesA(2), 4);
+        assert.equal(timesA(3), 6);
+        assert.equal(timesA.recomputations(), 2);
+
+        assert.equal(timesA(2), 4);
+        assert.equal(timesA(3), 6);
+        assert.equal(timesA.recomputations(), 2);
+
+        timesA.clearCache();
+        assert.equal(timesA(2), 4);
+        assert.equal(timesA(3), 6);
+        assert.equal(timesA.recomputations(), 4);
     })
 });

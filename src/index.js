@@ -50,16 +50,16 @@ class DefaultCache {
         this.cache[key] = value;
     }
 
-    // clear() {
-    //     this.cache = Object.create(null);
-    // }
+    clear() {
+        this.cache = Object.create(null);
+    }
 }
 
 class Computation {
     constructor() {
         this.observersList = []; // list of observers, used for fast iteration
         this.observersIdx = {};   // index by key, used to merge with other computation objects
-    } 
+    }
 
     addObserver(observer) {
         const key = getObserverKey(observer.id, observer.arg);
@@ -93,7 +93,7 @@ class Computation {
     }
 
     // For testing
-    observersIds() {
+    getObserversIds() {
         return Object.keys(this.observersIdx);
     }
 }
@@ -104,7 +104,7 @@ const defaultEquals = (a, b) => a === b;
 
 class Observer {
     constructor(id, resultFunc, isEqual, ctx) {
-        this.id = id;
+        this.id = `${id}`; // ensure string so that Computation can index by Id
         this.resultFunc = resultFunc;
         this.isEqual = isEqual;
         this.ctx = ctx;
@@ -137,7 +137,9 @@ class Observer {
     }
 
     getProxy() {
-        return this.invoke.bind(this);
+        const proxy = this.invoke.bind(this);
+        proxy.id = this.id;
+        return proxy;
     }
 }
 
@@ -148,6 +150,21 @@ class Selector {
         this.cache = cache;
         this.serialize = serialize;
         this.ctx = ctx;
+    }
+
+    mock() {
+        const cacheKey = this.serialize(arguments);
+        const computation = new Computation(cacheKey);
+        this.cache.set(cacheKey, computation);
+        return {
+            result(res) {
+                computation.result = res;
+            }
+        };
+    }
+
+    clearCache() {
+        this.cache.clear();
     }
 
     invoke() {
@@ -189,14 +206,14 @@ class Selector {
     dependencies() {
         const cacheKey = this.serialize(arguments);
         const computation = this.cache.get(cacheKey);
-        if (computation) {
-            return computation.observersIds();
-        }
+        return computation ? computation.getObserversIds() : [];
     }
 
     getProxy() {
         const proxy = this.invoke.bind(this);
         proxy.dependencies = this.dependencies.bind(this);
+        proxy.mock = this.mock.bind(this);
+        proxy.clearCache = this.clearCache.bind(this);
         proxy.recomputations = () => this.recomputations;
         return proxy;
     }
@@ -220,12 +237,8 @@ class Context {
         }
 
         const id = ++this.numObservers;
-
-        // let result;
-        const isEqual = options.isEqual
-            ? options.isEqual
-            : defaultEquals;
-
+        // const name = options.name || `observer-${id}`; 
+        const isEqual = options.isEqual || defaultEquals;
         const observer = new Observer(id, resultFunc, isEqual, this);
         return observer.getProxy();
     }
