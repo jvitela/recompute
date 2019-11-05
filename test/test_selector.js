@@ -772,7 +772,7 @@ suite('test utils', () => {
         assert.isArray(getAtimesB.dependencies());
         assert.isEmpty(getAtimesB.dependencies());
         assert.equal(getAtimesB(), 6);
-        assert.includeOrderedMembers(getAtimesB.dependencies(), [
+        assert.sameMembers(getAtimesB.dependencies(), [
             getA.id,
             getB.id
         ]);
@@ -830,5 +830,28 @@ suite('test utils', () => {
         assert.equal(timesA(2), 4);
         assert.equal(timesA(3), 6);
         assert.equal(timesA.recomputations(), 4);
+    })
+});
+
+suite('context', () => {
+    test('Mixing observers', () => {
+        const ctx1 = createContext({ 'foo': 'a1' });
+        const ctx2 = createContext({ 'bar': 'a2' });
+        const getA1 = ctx1.createObserver(state => state.foo);
+        const getA2 = ctx2.createObserver(state => state.bar);
+
+        const selA1A2 = ctx1.createSelector(() => getA1() + getA2());
+        const selA2A1 = ctx2.createSelector(() => getA2() + getA1());
+
+        assert.equal(selA1A2(), 'a1a2');
+        assert.equal(selA1A2.recomputations(), 1);
+        assert.sameMembers(selA1A2.dependencies(), [getA1.id, getA2.id]);
+
+        assert.equal(selA2A1(), 'a2a1');
+        assert.equal(selA2A1.recomputations(), 1);
+        assert.sameMembers(selA2A1.dependencies(), [getA1.id, getA2.id]);
+
+        ctx2.setState({ 'bar': 'a3' });
+        assert.equal(selA1A2(), 'a1a3');
     })
 });

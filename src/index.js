@@ -121,15 +121,13 @@ class Observer {
 
         // Create a link between this observer and
         //  the selectors calling it.
-        if (this.ctx.computationsStack.length) {
-            this.ctx.computationsStack.forEach(computation => {
-                computation.addObserver({
-                    id: this.id,
-                    isEqual: this.isEqual,
-                    resultFunc: this.resultFunc,
-                    arg,
-                    result,
-                });
+        for (let i = 0, l = Context.callStack.length; i < l; ++i) { 
+            Context.callStack[i].addObserver({
+                id: this.id,
+                isEqual: this.isEqual,
+                resultFunc: this.resultFunc,
+                arg,
+                result,
             });
         }
 
@@ -168,7 +166,6 @@ class Selector {
     }
 
     invoke() {
-        let i, l;
         const cacheKey = this.serialize(arguments);
         let computation = this.cache.get(cacheKey);
 
@@ -185,9 +182,12 @@ class Selector {
             }
 
             // Compute new result
-            this.ctx.computationsStack.push(computation);
-            computation.result = this.computeFunc.apply(null, arguments);
-            this.ctx.computationsStack.pop();
+            Context.callStack.push(computation);
+            try {
+                computation.result = this.computeFunc.apply(null, arguments);
+            } finally {
+                Context.callStack.pop();
+            }
 
             // Store new computation in the cache
             this.cache.set(cacheKey, computation);
@@ -195,9 +195,8 @@ class Selector {
         }
 
         // Share observer dependencies with the parent selectors.
-        l = this.ctx.computationsStack.length;
-        for (i = 0; i < l; ++i) {
-            this.ctx.computationsStack[i].mergeObservers(computation);
+        for (let i = 0, l = Context.callStack.length; i < l; ++i) {
+            Context.callStack[i].mergeObservers(computation);
         }
 
         return computation.result;
@@ -222,8 +221,6 @@ class Selector {
 class Context {
 
     constructor(initialState) {
-        this.computationsStack = [];
-        this.numObservers = 0;
         this.state = initialState;
     }
 
@@ -236,7 +233,7 @@ class Context {
             throw new Error('Observer methods cannot receive more than two arguments');
         }
 
-        const id = ++this.numObservers;
+        const id = ++Context.numObservers;
         // const name = options.name || `observer-${id}`; 
         const isEqual = options.isEqual || defaultEquals;
         const observer = new Observer(id, resultFunc, isEqual, this);
@@ -258,6 +255,9 @@ class Context {
         };
     }
 }
+
+Context.callStack = [];
+Context.numObservers = 0;
 
 export const createContext = initialState => {
     const context = new Context(initialState);
