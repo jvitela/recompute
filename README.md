@@ -3,22 +3,20 @@
 [![Travis][build-badge]][build]
 [![npm package][npm-badge]][npm]
 
-Simple “selector” library (for Redux and others) inspired by Reselect and Computed properties from MobX, Aurelia and Angular.
+Alternative “selector” library (for Redux and others) inspired by Reselect and Computed properties from MobX, Aurelia and Angular.
 
 Recompute is based on Observers and Selectors. Observers are simple non memoized functions used to read specific state properties. Selectors are memoized functions that compute results based on the values returned by one or more observers.
 
-* Observers have access to the entire state object.
 * Observers provide an interface to read from the state
-* Observers are Not memoized.
-* Observers should be cost efficient.
-* Observers can take one optional argument.
+* Selectors can compute derived data, allowing Redux to store the minimal possible state.
+* Selectors are efficient. A selector is not recomputed unless one of its dependencies changes.
+* Selectors are composable. They can be used as input to other selectors.
 
-* Selectors use observers to read values from the state
-* Selectors depend on observed state properties.
-* Selectors can compute derived data, allowing to store the minimal possible state.
-* Selectors are efficient. A selector is not recomputed unless one of its observer dependencies changes.
-* Selectors are composable. They can be invoked inside other selectors.
-* Selectors can receive any number of arguments.
+## Differences with Reselect
+* Selectors can be shared across multiple component instances
+* Selectors can take any number of arguments
+* Selectors have unbounded cache size
+* Selectors use a more intuitive syntax
 
 ```js
 import { createSelector, createObserver, setState } from '@jvitela/recompute'
