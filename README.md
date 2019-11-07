@@ -64,6 +64,7 @@ console.log(total('EUR'))    // { total: 2.322, currency: 'EUR' }
 - [API](#api)
   - [`createObserver`](#createobserver-resultfunc-options)
   - [`createSelector`](#createselector-resultfunc-options)
+- [Testing](#testing)
 
 ## Installation
 npm i @jvitela/recompute
@@ -293,6 +294,134 @@ Take into account that observers are **not memoized** and using expensive equali
 Selectors created with `createSelector` have an unlimited cache. This means they always store the last result matching its set of arguments.
 A selector recomputes when invoked with a different set of arguments. 
 Its cache will be cleared when at least one of the observers it depends on returns a different value.
+
+## Testing
+For a given state and input, a selector should always produce the same output. 
+For this reason they are simple to unit test.
+
+```js
+const a = createObserver(state => state.a)
+const b = createObserver(state => state.b)
+
+const selector = createSelector(() => ({
+  c: a() * 2,
+  d: b() * 3
+}))
+
+test("selector unit test", () => {
+  setState({ a: 1, b: 2 });
+  assert.deepEqual(selector(), { c: 2, d: 6 })
+  setState({ a: 2, b: 3 });
+  assert.deepEqual(selector(), { c: 4, d: 9 })
+})
+```
+
+It may also be useful to check that the memoization function for a selector works correctly. Each selector has a recomputations method that will return the number of times it has been recomputed:
+
+```js
+suite('selector', () => {
+  let state = { a: 1, b: 2 }
+
+  const reducer = (state, action) => (
+    {
+      a: action(state.a),
+      b: action(state.b)
+    }
+  )
+
+  const a = createObserver(state => state.a)
+  const b = createObserver(state => state.b)
+  const selector = createSelector(() => ({
+    c: a() * 2,
+    d: b() * 3
+  }))
+
+  const plusOne = x => x + 1
+  const id = x => x
+
+  test("selector unit test", () => {
+    setState(state = reducer(state, plusOne))
+    assert.deepEqual(selector(), { c: 4, d: 9 })
+    
+    setState(state = reducer(state, id))
+    assert.deepEqual(selector(), { c: 4, d: 9 })
+    assert.equal(selector.recomputations(), 1)
+    
+    setState(state = reducer(state, plusOne))
+    assert.deepEqual(selector(), { c: 6, d: 12 })
+    assert.equal(selector.recomputations(), 2)
+  })
+})
+```
+
+If you have selectors composed of many other selectors, 
+you can mock the result of the nested selectors so that you can test each selector without coupling all of your tests to the entire shape of your state.
+
+For example if you have a set of selectors like this:
+
+```js
+export const firstSelector = createSelector( ... )
+export const secondSelector = createSelector( ... )
+export const thirdSelector = createSelector( ... )
+
+export const myComposedSelector = createSelector(() => 
+  firstSelector() * secondSelector() < thirdSelector()
+)
+```
+
+And then a set of unit tests like this:
+
+```js
+test("myComposedSelector unit test", () => {
+  firstSelector.mock().result(1);
+  secondSelector.mock().result(2);
+  thirdSelector.mock().result(3);
+  assert(myComposedSelector.resultFunc(), true)
+
+  firstSelector.mock().result(2);
+  secondSelector.mock().result(2);
+  thirdSelector.mock().result(1);
+  assert(myComposedSelector.resultFunc(), false)
+})
+```
+
+In order to test dependency tracking of your selectors, you can invoque the method `dependencies` that will return an array of observer ids. Each observer has a unique Id which can be accessed directly
+```js
+  const getA = createObserver(() => state.a);
+  const getB = createObserver(() => state.b);
+  const getC = createObserver(() => state.c);
+  const get2B = createSelector(() => getB() * 2);
+  const get2C = createSelector(() => getC() * 2);
+  const getA2B = createSelector(() => getA() + get2B());
+  const getA2C = createSelector(() => getA() + get2C());
+  const getABC = createSelector(() => (getA2B() + getA2C()) / 2);
+
+  assert.equal(getABC(), 6); // Run once to discover dependencies
+  assert.sameMembers(get2B.dependencies(),  [getB.id]);
+  assert.sameMembers(get2C.dependencies(),  [getC.id]);
+  assert.sameMembers(getA2B.dependencies(), [getA.id, getB.id]);
+  assert.sameMembers(getA2C.dependencies(), [getA.id, getC.id]);
+  assert.sameMembers(getABC.dependencies(), [getA.id, getB.id, getC.id]);
+```
+
+Finally, each selector has a `clearCache` method that clears the selector cache. 
+The intended use is for a complex selector that may have many independent tests and you don't want to manually manage the computation count or create a "dummy" selector for each test.
+
+```js
+  const getA = createObserver(() => 2);
+  const timesA = createSelector(times => getA() * times);
+
+  assert.equal(timesA(2), 4);
+  assert.equal(timesA(3), 6);
+  assert.equal(timesA.recomputations(), 2);
+
+  timesA.clearCache();
+  assert.equal(timesA.recomputations(), 0);
+
+  assert.equal(timesA(2), 4);
+  assert.equal(timesA(3), 6);
+  assert.equal(timesA.recomputations(), 2);
+```
 
 [build-badge]: https://travis-ci.org/jvitela/recompute.svg?branch=master
 [build]: https://travis-ci.org/jvitela/recompute

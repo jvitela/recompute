@@ -224,10 +224,6 @@ class Context {
         this.state = initialState;
     }
 
-    setState(newState) {
-        this.state = newState;
-    }
-
     createObserver(resultFunc, options = {}) {
         if (resultFunc.length > 2) {
             throw new Error('Observer methods cannot receive more than two arguments');
@@ -251,7 +247,7 @@ class Context {
         return {
             createObserver: this.createObserver.bind(this),
             createSelector: this.createSelector.bind(this),
-            setState: this.setState.bind(this)
+            setState: newState => this.state = newState
         };
     }
 }
