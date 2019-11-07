@@ -404,23 +404,33 @@ In order to test dependency tracking of your selectors, you can invoque the meth
   assert.sameMembers(getABC.dependencies(), [getA.id, getB.id, getC.id]);
 ```
 
-Finally, each selector has a `clearCache` method that clears the selector cache. 
-The intended use is for a complex selector that may have many independent tests and you don't want to manually manage the computation count or create a "dummy" selector for each test.
+Finally, each selector has a `clearCache` method that clears the selector cache.
 
 ```js
+test('Clear cache', () => { 
   const getA = createObserver(() => 2);
   const timesA = createSelector(times => getA() * times);
+
+  timesA.mock(2).result(4);
+  timesA.mock(3).result(6);
+  assert.equal(timesA(2), 4);
+  assert.equal(timesA(3), 6);
+  assert.equal(timesA.recomputations(), 0);
+
+  timesA.clearCache();
+  assert.equal(timesA(2), 4);
+  assert.equal(timesA(3), 6);
+  assert.equal(timesA.recomputations(), 2);
 
   assert.equal(timesA(2), 4);
   assert.equal(timesA(3), 6);
   assert.equal(timesA.recomputations(), 2);
 
   timesA.clearCache();
-  assert.equal(timesA.recomputations(), 0);
-
   assert.equal(timesA(2), 4);
   assert.equal(timesA(3), 6);
-  assert.equal(timesA.recomputations(), 2);
+  assert.equal(timesA.recomputations(), 4);
+})
 ```
 
 [build-badge]: https://travis-ci.org/jvitela/recompute.svg?branch=master
