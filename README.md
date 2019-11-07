@@ -271,7 +271,7 @@ Using the `getVisibleTodos` selector with multiple instances of the `VisibleTodo
 A selector created with `createSelector` has an unlimited cache size and can return different cached results depending on the arguments passed to the selector. When at least one of the state properties read by the selector changes, its complete cache will be cleared.
 
 ## API
-### createObserver(resultFunc, options = {})
+### createObserver(resultFunc, options = { isEqual })
 Recompute determines if the value returned by `resultFunc` has changed between calls using reference equality (`===`). Alternatively you can pass a custom equality comparator to the options object:
 
 #### Customize `equalityCheck` for `createObserver`
@@ -290,10 +290,8 @@ const getDateStr = createObserver(state => state.date, { isEqual: isSameDay})
 
 Take into account that observers are **not memoized** and using expensive equality functions would have an impact on performance.
 
-### createSelector(resultFunc, options = {})
-Selectors created with `createSelector` have an unlimited cache. This means they always store the last result matching its set of arguments.
-A selector recomputes when invoked with a different set of arguments. 
-Its cache will be cleared when at least one of the observers it depends on returns a different value.
+### createSelector(resultFunc, options = { cache, serialize })
+Selectors created with `createSelector` have an unbounded cache size. This means they always store the last result matching its set of arguments. A selector recomputes when invoked with a different set of arguments. You can manually clear its cache with the `clearCache` method (See [Testing](#testing-cache-clearing) section for details)
 
 ## Testing
 For a given state and input, a selector should always produce the same output. 
@@ -316,6 +314,7 @@ test("selector unit test", () => {
 })
 ```
 
+### Testing recomputations
 It may also be useful to check that the memoization function for a selector works correctly. Each selector has a recomputations method that will return the number of times it has been recomputed:
 
 ```js
@@ -354,6 +353,7 @@ suite('selector', () => {
 })
 ```
 
+### Mocking composed selectors
 If you have selectors composed of many other selectors, 
 you can mock the result of the nested selectors so that you can test each selector without coupling all of your tests to the entire shape of your state.
 
@@ -385,6 +385,7 @@ test("myComposedSelector unit test", () => {
 })
 ```
 
+### Test dependency tracking
 In order to test dependency tracking of your selectors, you can invoque the method `dependencies` that will return an array of observer ids. Each observer has a unique Id which can be accessed directly
 ```js
   const getA = createObserver(() => state.a);
@@ -404,6 +405,7 @@ In order to test dependency tracking of your selectors, you can invoque the meth
   assert.sameMembers(getABC.dependencies(), [getA.id, getB.id, getC.id]);
 ```
 
+### Testing cache clearing
 Finally, each selector has a `clearCache` method that clears the selector cache.
 
 ```js
