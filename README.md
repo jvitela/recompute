@@ -376,12 +376,12 @@ test("myComposedSelector unit test", () => {
   firstSelector.mock().result(1);
   secondSelector.mock().result(2);
   thirdSelector.mock().result(3);
-  assert(myComposedSelector.resultFunc(), true)
+  assert(myComposedSelector(), true)
 
   firstSelector.mock().result(2);
   secondSelector.mock().result(2);
   thirdSelector.mock().result(1);
-  assert(myComposedSelector.resultFunc(), false)
+  assert(myComposedSelector(), false)
 })
 ```
 
