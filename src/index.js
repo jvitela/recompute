@@ -173,10 +173,11 @@ class Selector {
             !computation ||
             computation.dependenciesChanged(this.ctx.state)  // dependencies didn't change
         ) {
-            // invalidate the cache if dependencies changed??
-            // if (computation) {
-            //     this.cache.clear();
-            // }
+            // if dependencies changed it means that the observed state changed
+            //  therefore we should invalidate the cache
+            if (computation) {
+                this.cache.clear();
+            }
             if (!computation) {
                 computation = new Computation(cacheKey);
             }
