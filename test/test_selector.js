@@ -80,6 +80,17 @@ suite('selector', () => {
         assert.sameMembers(getAB.dependencies(), [getA.id, getB.id]);
     });
 
+    test('tracking same dependency with different arguments', () => { 
+        const { createObserver, createSelector } = createContext('/');
+        const getter = createObserver((state, opt) => state + opt);
+        const selector = createSelector(() => getter('a') + getter('b'));
+        assert.equal(selector(), '/a/b');
+        assert.sameMembers(selector.dependencies(), [
+            getter.key('a'),
+            getter.key('b')
+        ]);
+    });
+
     test('inherits dependencies from children selectors', () => {
         let state = { a: 1, b: 2, c: 3 };
         const { createObserver, createSelector } = createContext();

@@ -422,12 +422,25 @@ In order to test dependency tracking of your selectors, you can invoque the meth
   const getA2C = createSelector(() => getA() + get2C());
   const getABC = createSelector(() => (getA2B() + getA2C()) / 2);
 
-  assert.equal(getABC(), 6); // Run once to discover dependencies
+  assert.equal(getABC(), 6); // Run once to track dependencies
   assert.sameMembers(get2B.dependencies(),  [getB.id]);
   assert.sameMembers(get2C.dependencies(),  [getC.id]);
   assert.sameMembers(getA2B.dependencies(), [getA.id, getB.id]);
   assert.sameMembers(getA2C.dependencies(), [getA.id, getC.id]);
   assert.sameMembers(getABC.dependencies(), [getA.id, getB.id, getC.id]);
+```
+
+And in case of observers that take an argument you can call `key` with the argument in order
+  to get the correct dependency id.
+
+```js
+  const foo = createObserver((state, opt) => state + opt);
+  const bar = createSelector(() => foo('a') + foo('b'));
+  bar(); // Run once to track dependencies
+  assert.sameMembers(
+    bar.dependencies(), 
+    [ foo.key('a'), foo.key('b') ]
+  );
 ```
 
 ### Testing cache clearing

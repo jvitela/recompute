@@ -141,6 +141,7 @@ class Observer {
     getProxy() {
         const proxy = this.invoke.bind(this);
         proxy.id = this.id;
+        proxy.key = arg => getObserverKey(this.id, arg);
         return proxy;
     }
 }
