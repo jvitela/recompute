@@ -182,9 +182,10 @@ class Selector {
             if (computation) {
                 this.cache.clear();
             }
-            if (!computation) {
-                computation = new Computation(cacheKey);
-            }
+
+            // always create a new computation before we recompute the result 
+            //  so that we can untrack previous dependencies.
+            computation = new Computation(cacheKey);
 
             // Compute new result
             Context.callStack.push(computation);

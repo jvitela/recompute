@@ -777,6 +777,43 @@ suite('selector', () => {
         value = 3;
         assert.equal(selector(), 3);
     })
+
+    test('Untracks dependencies', () => {
+        const { createObserver, createSelector, setState } = createContext();
+
+        const shopItemsIds  = createObserver(state => state.result);
+        const shopItemValue = createObserver((state, id) => state.items[id].value)
+        const subtotal = createSelector(() =>
+            shopItemsIds().reduce((acc, id) => acc + shopItemValue(id), 0)
+        );
+
+        // Initial run
+        let state = {
+            result: ['a', 'b', 'c'],
+            items: {
+                a: { value: 10 },
+                b: { value:  5 },
+                c: { value: 15 },
+            }
+        };
+        setState(state);
+        assert.equal(subtotal(), 30);
+        assert.equal(subtotal.recomputations(), 1);
+        assert.equal(subtotal.dependencies().length, 4);
+
+        // Removes values
+        state = {
+            result: ['a', 'c'],
+            items: {
+                a: state.items.a,
+                c: state.items.c
+            }
+        };
+        setState(state);
+        assert.equal(subtotal(), 25);
+        assert.equal(subtotal.recomputations(), 2);
+        assert.equal(subtotal.dependencies().length, 3);
+    })
 });
 
 suite('test utils', () => {
