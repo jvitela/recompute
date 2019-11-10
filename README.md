@@ -62,8 +62,8 @@ console.log(total('EUR'))    // { total: 2.322, currency: 'EUR' }
   - [Connecting a Selector to the Redux Store](#connecting-a-selector-to-the-redux-store)
   - [Accessing React Props in Selectors](#accessing-react-props-in-selectors)
 - [API](#api)
-  - [`createObserver`](#createobserver-resultfunc-options)
-  - [`createSelector`](#createselector-resultfunc-options)
+  - [`createObserver`](#user-content-createobserverresultfunc-options---isequal-)
+  - [`createSelector`](#user-content-createselectorresultfunc-options---cache-serialize-)
 - [Testing](#testing)
 
 ## Installation
@@ -272,7 +272,7 @@ A selector created with `createSelector` has an unlimited cache size and can ret
 
 ## API
 ### createObserver(resultFunc, options = { isEqual })
-Recompute determines if the value returned by `resultFunc` has changed between calls using reference equality (`===`). Alternatively you can pass a custom equality comparator to the options object:
+Recompute determines if the value returned by `resultFunc` has changed between calls using reference equality (`===`). Alternatively you can pass a custom `isEqual` equality comparator to the options object.
 
 #### Customize `equalityCheck` for `createObserver`
 
@@ -292,6 +292,31 @@ Take into account that observers are **not memoized** and using expensive equali
 
 ### createSelector(resultFunc, options = { cache, serialize })
 Selectors created with `createSelector` have an unbounded cache size. This means they always store the last result matching its set of arguments. A selector recomputes when invoked with a different set of arguments. You can manually clear its cache with the `clearCache` method (See [Testing](#testing-cache-clearing) section for details)
+
+#### Custom cache for selector
+The selector expects a cache object with the following methods
+  - get(key): Return the cache contents associated to given `key`
+  - set(key, value): Stores `value` in the cache for `key`
+  - clear(): Clear all the contents of the cache
+
+```js
+  class CustomCache {
+    constructor() { this.contents = {}; } 
+    get(key) { return this.contents[key]; }
+    set(key, value) { this.contents[key] = value; }
+    clear() { this.contents = {}; } 
+  };
+
+  const selector = createSelector(selectorFn, { cache: new CustomCache() })
+```
+
+#### Custom cache key serializer for selector
+The serializer option is used to generate the cache key. This function receives an array with the arguments used to invoke the selector and must return a key to be used by the cache.
+
+```js
+  const serialize = args => JSON.stringify(args);
+  const selector = createSelector(selectorFn, { serialize })
+```
 
 ## Testing
 For a given state and input, a selector should always produce the same output. 
