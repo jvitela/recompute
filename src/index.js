@@ -19,7 +19,11 @@ const defaultSerialize = args => {
     if (args.length === 1 && isPrimitive(args[0])) {
         return `${args[0]}`;
     }
-    return JSON.stringify(args);
+    const key = JSON.stringify(args);
+    if (key.length >= 1024) {
+        console.warn('Passing large objects as arguments to selectors might impact memory usage. Arguments:', args);
+    }
+    return key;
 };
 
 const getObserverKey = (id, arg) => {

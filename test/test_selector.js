@@ -342,6 +342,31 @@ suite('selector', () => {
         assert.equal(sumArgs.recomputations(), 3);
     })
 
+    test('warns when passing large objects as arguments', () => { 
+        const smallPayload = { "name": { "title": "Mrs", "first": "Anna", "last": "Richards" } };
+        const largePayload = { "results": [{ "gender": "female", "name": { "title": "Mrs", "first": "Anna", "last": "Richards" }, "location": { "street": { "number": 7961, "name": "North Street" }, "city": "Chichester", "state": "Northamptonshire", "country": "United Kingdom", "postcode": "N12 9PX", "coordinates": { "latitude": "6.9498", "longitude": "68.6662" }, "timezone": { "offset": "+5:00", "description": "Ekaterinburg, Islamabad, Karachi, Tashkent" } }, "email": "anna.richards@example.com", "login": { "uuid": "1caac83a-5e83-4e48-a77c-f2f45800f275", "username": "smallzebra251", "password": "honey1", "salt": "6Ip3rGND", "md5": "5d0cf3d6ef4cea92fe225b85ec60e617", "sha1": "174a58fc96fccef0a258af8e6d515e51b8f10b45", "sha256": "b0959e8e600b0f3d4bff7c5bbedd9a316efac6cc6c2e28c7a6ff5d04d7a8d6eb" }, "dob": { "date": "1995-11-28T07:47:28.714Z", "age": 24 }, "registered": { "date": "2006-08-31T11:07:11.172Z", "age": 13 }, "phone": "015395 28784", "cell": "0749-670-750", "id": { "name": "NINO", "value": "AM 17 20 58 T" }, "picture": { "large": "https://randomuser.me/api/portraits/women/30.jpg", "medium": "https://randomuser.me/api/portraits/med/women/30.jpg", "thumbnail": "https://randomuser.me/api/portraits/thumb/women/30.jpg" }, "nat": "GB" }], "info": { "seed": "7b997f703b562577", "results": 1, "page": 1, "version": "1.3" } };
+        const { createObserver, createSelector } = createContext({ a:1 });
+        const getA = createObserver(state => state.a);
+        const selA = createSelector(payload => `${getA()}: ${JSON.stringify(payload)}`);
+
+        // Stub console warn
+        let warnCount = 0;
+        const consoleWarn = console.warn;
+        console.warn = () => ++warnCount;
+
+        // Run the selector
+        assert.strictEqual(selA(smallPayload), selA(smallPayload));
+        assert.equal(selA.recomputations(), 1);
+        assert.equal(warnCount, 0);
+
+        assert.strictEqual(selA(largePayload), selA(largePayload));
+        assert.equal(selA.recomputations(), 2);
+        assert.equal(warnCount, 2);
+    
+        // Restore
+        console.warn = consoleWarn;
+    })
+
     test('recomputes result after exception', () => {
         let called = 0
         const { createObserver, createSelector } = createContext({ a: 1 });
@@ -834,7 +859,7 @@ suite('test utils', () => {
 });
 
 suite('context', () => {
-    test('Mixing observers', () => {
+    test('Mixing observers from different contexts', () => {
         const ctx1 = createContext({ 'foo': 'a1' });
         const ctx2 = createContext({ 'bar': 'a2' });
         const getA1 = ctx1.createObserver(state => state.foo);
