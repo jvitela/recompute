@@ -266,9 +266,9 @@ const mapStateToProps = (state, props) => {
 ```
 
 So now `getVisibleTodos` has access to `listId`, and everything is working fine.
-Using the `getVisibleTodos` selector with multiple instances of the `VisibleTodoList` container will correctly memoize
+Using the `getVisibleTodos` selector with multiple instances of the `VisibleTodoList` container will correctly memoize.
 
-A selector created with `createSelector` has an unlimited cache size and can return different cached results depending on the arguments passed to the selector. When at least one of the state properties read by the selector changes, its complete cache will be cleared.
+A selector created with `createSelector` has an unlimited cache size and can return different cached results depending on the arguments used to invoke to the selector. When the selector's observed state properties change, its internal cache will be cleared.
 
 ## API
 ### createObserver(resultFunc, options = { isEqual })
