@@ -215,12 +215,16 @@ class Selector {
         return computation ? computation.getObserversIds() : [];
     }
 
-    getProxy() {
+    getProxy(context) {
         const proxy = this.invoke.bind(this);
         proxy.dependencies = this.dependencies.bind(this);
         proxy.mock = this.mock.bind(this);
         proxy.clearCache = this.clearCache.bind(this);
         proxy.recomputations = () => this.recomputations;
+        proxy.withState = state => {
+            context.setState(state);
+            return proxy;
+        };
         return proxy;
     }
 }
@@ -247,7 +251,7 @@ class Context {
         const cache = options.cache || createDefaultCache();
         const serialize = options.serialize || defaultSerialize;
         const selector = new Selector(computeFunc, cache, serialize, this);
-        return selector.getProxy();
+        return selector.getProxy(this);
     }
 
     getProxy() {
